@@ -1,0 +1,39 @@
+name: Deploy to EC2
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v3
+
+    - name: Deploy to EC2
+      uses: appleboy/ssh-action@master
+      with:
+        host: ${{ secrets.EC2_HOST }}
+        username: ${{ secrets.EC2_USER }}
+        key: ${{ secrets.EC2_SSH_KEY }}
+        script: |
+          cd 2-tier-monitoring
+          git pull origin main
+          
+          docker stop flask-container || true
+          docker rm flask-container || true
+          
+          docker build -t flask-app ./app
+          
+          docker run -d \
+          --name flask-container \
+          --network flask-network \
+          -p 8080:8080 \
+          -e DBHOST=mysql-container \
+          -e DBUSER=root \
+          -e DBPWD=password \
+          -e DBPORT=3306 \
+          flask-app
